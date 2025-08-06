@@ -228,9 +228,9 @@ class PartialDependencePlotter:
         return fig
     
     def plot_feature_interaction(self, feature_pair, target_idx=0, figsize=(8, 6),
-                                contour_kw=None, ax=None, grid_resolution=50):
+                            contour_kw=None, ax=None, grid_resolution=50):
         """
-        2つの特徴量間の相互作用を2Dプロットで可視化
+        2つの特徴量間の相互作用を2Dプロットで可視化（修正版）
         
         Parameters:
         -----------
@@ -289,35 +289,92 @@ class PartialDependencePlotter:
         # スケーリングされた特徴量でプロット
         scaled_features = self.scale_features()
         
-        # デフォルトの等高線プロットオプション
-        if contour_kw is None:
-            contour_kw = {
-                'alpha': 0.75,
-                'cmap': 'viridis',
-                'levels': 50
-            }
-            
         # 2つの特徴量の組み合わせを計算
         feature_pair_idx = (feature_idxs[0], feature_idxs[1])
         
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            # 最新のscikit-learnのAPIを使用
-            display = PartialDependenceDisplay.from_estimator(
-                self.model, scaled_features, [feature_pair_idx], 
-                target=target_idx, ax=ax,
-                kind='average', grid_resolution=grid_resolution,
-                contour_kw=contour_kw
-            )
+        print(f"相互作用プロット生成: {feature_names[0]} × {feature_names[1]}")
+        
+        # === 修正箇所：エラー回避のための複数の方法を試行 ===
+        
+        try:
+            # 方法1: contour_kwパラメータなしで試行
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                display = PartialDependenceDisplay.from_estimator(
+                    self.model, scaled_features, [feature_pair_idx], 
+                    target=target_idx, ax=ax,
+                    kind='average', grid_resolution=grid_resolution
+                    # contour_kw は削除してデフォルトに任せる
+                )
+                
+            ax.set_title(f"特徴量相互作用: {feature_names[0]} vs {feature_names[1]}", fontsize=12)
+            print(f"✓ 相互作用プロット生成成功: {feature_names[0]} × {feature_names[1]}")
             
-        ax.set_title(f"特徴量相互作用: {feature_names[0]} vs {feature_names[1]}", fontsize=12)
+        except Exception as e:
+            print(f"PartialDependenceDisplay エラー: {e}")
+            
+            # 方法2: 手動で部分依存を計算してプロット
+            try:
+                print("手動での相互作用プロット生成を試行...")
+                
+                # 部分依存値を手動で計算
+                from sklearn.inspection import partial_dependence
+                pd_result = partial_dependence(
+                    self.model,
+                    scaled_features,
+                    features=[feature_pair_idx],
+                    grid_resolution=grid_resolution,
+                    kind='average'
+                )
+                
+                # 結果を取得
+                values = pd_result['values'][0]
+                grid = pd_result['grid']
+                
+                # 手動でcontourプロット
+                X_grid, Y_grid = np.meshgrid(grid[0], grid[1])
+                
+                # pcolormeshを使用（contourfより安全）
+                im = ax.pcolormesh(X_grid, Y_grid, values, shading='auto', cmap='viridis')
+                
+                # カラーバーを追加
+                fig.colorbar(im, ax=ax, label='Partial Dependence')
+                
+                # 等高線を追加（オプション、エラーが出ても続行）
+                try:
+                    contour = ax.contour(X_grid, Y_grid, values, levels=10, colors='white', alpha=0.6, linewidths=0.8)
+                    ax.clabel(contour, inline=True, fontsize=8)
+                except:
+                    pass  # 等高線でエラーが出ても無視
+                
+                # ラベル設定
+                ax.set_xlabel(feature_names[0])
+                ax.set_ylabel(feature_names[1])
+                ax.set_title(f"特徴量相互作用: {feature_names[0]} vs {feature_names[1]}")
+                
+                print(f"✓ 手動での相互作用プロット生成成功: {feature_names[0]} × {feature_names[1]}")
+                
+            except Exception as e2:
+                print(f"手動プロット生成もエラー: {e2}")
+                
+                # 方法3: 最もシンプルなフォールバック
+                ax.text(0.5, 0.5, 
+                    f"相互作用プロット生成失敗\n{feature_names[0]} × {feature_names[1]}\n\n"
+                    f"エラー1: {str(e)[:50]}...\n"
+                    f"エラー2: {str(e2)[:50]}...", 
+                    ha='center', va='center', transform=ax.transAxes, fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.5))
+                ax.set_title(f"相互作用プロット: {feature_names[0]} × {feature_names[1]} (エラー)")
+                ax.set_xlabel(feature_names[0])
+                ax.set_ylabel(feature_names[1])
+                
+                print(f"✗ 相互作用プロット生成失敗: {feature_names[0]} × {feature_names[1]}")
         
         return fig, ax
-    
     def save_plots(self, feature_importances, output_dir='plots', target_idx=0, 
-                   n_features=10, n_cols=3, grid_resolution=100, format='png', dpi=300):
+               n_features=10, n_cols=3, grid_resolution=100, format='png', dpi=300):
         """
-        重要度の高い特徴量の部分依存プロットを保存
+        重要度の高い特徴量の部分依存プロットを保存（修正版）
         
         Parameters:
         -----------
@@ -367,53 +424,75 @@ class PartialDependencePlotter:
         
         saved_files = []
         
+        print(f"部分依存プロット保存開始: {len(top_feature_names)}個の特徴量")
+        
         # 1. 全ての重要な特徴量の部分依存プロットを一つの図に
-        fig = self.plot_multiple_features(
-            top_feature_names, target_idx=target_idx, n_cols=n_cols,
-            grid_resolution=grid_resolution
-        )
+        try:
+            print("統合部分依存プロット生成中...")
+            fig = self.plot_multiple_features(
+                top_feature_names, target_idx=target_idx, n_cols=n_cols,
+                grid_resolution=grid_resolution
+            )
+            
+            filename = os.path.join(output_dir, f"pdp_top{n_features}.{format}")
+            fig.savefig(filename, dpi=dpi, bbox_inches='tight')
+            plt.close(fig)
+            saved_files.append(filename)
+            print(f"✓ 統合プロット保存: {filename}")
+            
+        except Exception as e:
+            print(f"✗ 統合プロット生成エラー: {e}")
         
-        filename = os.path.join(output_dir, f"pdp_top{n_features}.{format}")
-        fig.savefig(filename, dpi=dpi, bbox_inches='tight')
-        plt.close(fig)
-        saved_files.append(filename)
-        
-        # 2. 個別の特徴量ごとにプロット
-        # for feature_name in top_feature_names:
-        #     fig, ax = self.plot_single_feature(
-        #         feature_name, target_idx=target_idx,
-        #         grid_resolution=grid_resolution
-        #     )
+        # # 2. 個別の特徴量ごとにプロット
+        # print("個別特徴量プロット生成中...")
+        # for i, feature_name in enumerate(top_feature_names):
+        #     try:
+        #         fig, ax = self.plot_single_feature(
+        #             feature_name, target_idx=target_idx,
+        #             grid_resolution=grid_resolution
+        #         )
+                
+        #         # ファイル名から無効な文字を削除
+        #         clean_name = feature_name.replace(' ', '_').replace('/', '_').replace('\\', '_')
+        #         clean_name = ''.join(c for c in clean_name if c.isalnum() or c in '_-.')
+                
+        #         filename = os.path.join(output_dir, f"pdp_{clean_name}.{format}")
+        #         fig.savefig(filename, dpi=dpi, bbox_inches='tight')
+        #         plt.close(fig)
+        #         saved_files.append(filename)
+        #         print(f"✓ 個別プロット保存 ({i+1}/{len(top_feature_names)}): {filename}")
+                
+        #     except Exception as e:
+        #         print(f"✗ 個別プロット生成エラー ({feature_name}): {e}")
+                
+        # 3. 上位2つの特徴量の相互作用プロット（修正版を使用）
+        if len(top_feature_names) >= 2:
+            try:
+                print("特徴量相互作用プロット生成中...")
+                fig, ax = self.plot_feature_interaction(
+                    top_feature_names[:2], target_idx=target_idx,
+                    grid_resolution=min(grid_resolution, 50)  # 2Dプロットは解像度を下げる
+                )
+                
+                clean_name1 = top_feature_names[0].replace(' ', '_').replace('/', '_').replace('\\', '_')
+                clean_name1 = ''.join(c for c in clean_name1 if c.isalnum() or c in '_-.')
+                
+                clean_name2 = top_feature_names[1].replace(' ', '_').replace('/', '_').replace('\\', '_')
+                clean_name2 = ''.join(c for c in clean_name2 if c.isalnum() or c in '_-.')
+                
+                filename = os.path.join(output_dir, f"pdp_interaction_{clean_name1}_{clean_name2}.{format}")
+                fig.savefig(filename, dpi=dpi, bbox_inches='tight')
+                plt.close(fig)
+                saved_files.append(filename)
+                print(f"✓ 相互作用プロット保存: {filename}")
+                
+            except Exception as e:
+                print(f"✗ 相互作用プロット生成エラー: {e}")
+                import traceback
+                traceback.print_exc()
             
-        #     # ファイル名から無効な文字を削除
-        #     clean_name = feature_name.replace(' ', '_').replace('/', '_').replace('\\', '_')
-        #     clean_name = ''.join(c for c in clean_name if c.isalnum() or c in '_-.')
-            
-        #     filename = os.path.join(output_dir, f"pdp_{clean_name}.{format}")
-        #     fig.savefig(filename, dpi=dpi, bbox_inches='tight')
-        #     plt.close(fig)
-        #     saved_files.append(filename)
-            
-        # 3. 上位2つの特徴量の相互作用プロット
-        # if len(top_feature_names) >= 2:
-        #     fig, ax = self.plot_feature_interaction(
-        #         top_feature_names[:2], target_idx=target_idx,
-        #         grid_resolution=min(grid_resolution, 50)  # 2Dプロットは解像度を下げる
-        #     )
-            
-        #     clean_name1 = top_feature_names[0].replace(' ', '_').replace('/', '_').replace('\\', '_')
-        #     clean_name1 = ''.join(c for c in clean_name1 if c.isalnum() or c in '_-.')
-            
-        #     clean_name2 = top_feature_names[1].replace(' ', '_').replace('/', '_').replace('\\', '_')
-        #     clean_name2 = ''.join(c for c in clean_name2 if c.isalnum() or c in '_-.')
-            
-        #     filename = os.path.join(output_dir, f"pdp_interaction_{clean_name1}_{clean_name2}.{format}")
-        #     fig.savefig(filename, dpi=dpi, bbox_inches='tight')
-        #     plt.close(fig)
-        #     saved_files.append(filename)
-            
-        # print(f"{len(saved_files)}個のプロットを {output_dir} ディレクトリに保存しました")
-        # return saved_files
+        print(f"✓ 部分依存プロット保存完了: {len(saved_files)}個のファイルを {output_dir} に保存")
+        return saved_files
 
 
 def analyze_partial_dependence(model, X, feature_importances, output_dir='pdp_plots', target_names=None):

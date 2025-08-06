@@ -593,7 +593,7 @@ def create_partial_dependence_plots(self, results):
             return
             
         # PartialDependencePlotterクラスをインポート
-        from models.partial_dependence_plotter_kaiki import PartialDependencePlotter
+        from models.partial_dependence_plotter_kaikidev_ale import PartialDependencePlotter
         
         # 上位6個の特徴量を選択 (1次元プロット用)
         top_features_1d = feature_importance.head(6)['feature'].tolist()
