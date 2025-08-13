@@ -1,0 +1,195 @@
+G:\共有ドライブ\GAP_長寿研\user\iwamoto\視線の動きの俊敏さ
+
+conda activate new_base_env
+
+
+視線の動きの俊敏さ/
+├── data/
+├── feature_generation/
+│   ├── extractioncondition/
+│   │   ├── __pycache__/
+│   │   │   └── sensitivityfilter.cpython-312.pyc
+│   │   └── sensitivityfilter.py
+│   └── fdata/特徴量生成後データ
+│       ├── All_EyeCenterAngle_all.py
+│       ├── EyeCenterAngle_all.py
+│       ├── MainEyecenter_saccade_angleV.py
+│       ├── MainEyeCenterAngle_Eyestd.py
+│       ├── MainEyeCenterAngle_Nosaccade.py
+│       ├── MainEyeCenterAngle.py
+│       ├── microsaccade_EyeCenterAngle_all.py
+│       ├── saccade_EyeCenterAngle_-5s.py
+│       ├── saccade_EyeCenterAngle_all.py
+│       ├── saccade_RotatedEyeCenter_all - コピー.py
+│       ├── saccade_RotatedEyeCenter_all.py
+│       └── saccade_velo.py
+├── models/実装したアルゴリズム等
+│   ├── __pycache__/
+│   ├── __init__.py
+│   ├── __init__copy.py
+│   ├── ale_plotter.py
+│   ├── base_model - 0219.py
+│   ├── base_model.py
+│   ├── catboost_model.py
+│   ├── catboost_regression_model.py
+│   ├── cross_validator.py
+│   ├── cross_validator.py.b.py
+│   ├── file-organizer.py
+│   ├── lightgbm_model.py
+│   ├── new_pdp_noice.py
+│   ├── new_pdp.py
+│   ├── partial_dependence_plotter_kaiki.py
+│   ├── partial_dependence_plotter_kaikide...py
+│   ├── partial_dependence_plotter.py
+│   ├── partial_dependence_plotter.pybacku...py
+│   ├── random_forest_model.py
+│   ├── regression_models.py
+│   ├── regression_smote.py
+│   ├── regression_smotebackup.py
+│   ├── RegressionResultManager.py
+│   ├── rusboost_model.py
+│   ├── simplecatboost.py
+│   ├── undersampling_bagging_model.py
+│   ├── undersampling_model.py
+│   ├── xgboost_model.py
+│   └── xgboost_regression_model.py
+├── visualization/可視化・評価ツール
+│   ├── __pycache__/
+│   ├── __init__.py
+│   ├── eye_tracking_visualizer.py
+│   ├── eye_tracking_visualizer.py.back.py
+│   ├── eye_tracking_visualizer.pyb
+│   ├── model_evaluator.py
+│   ├── regression_ice.py
+│   ├── regression_model_evaluator.py
+│   ├── regression_pdp_handler.py
+│   ├── regression_visualizer.bupy
+│   ├── regression_visualizer.py
+│   ├── smote_visualization.py
+│   ├── threshold_evaluator.py
+│   └── threshold_evaluator2.py
+├── pretreatment/前処理ツール
+│   ├── cluster_features.png
+│   ├── elbow_method.png
+│   ├── join.ipynb
+│   ├── kmeans_clusters.png
+│   └── umap.ipynb
+├── result/モデルを実行した後の結果
+├── saccade_features/
+├── main - コピー.py
+├── main_icek.py
+├── main_kaiki3.py
+├── main_pdp6.py
+├── main.py
+├── main5_kaiki.py
+├── main5_kaiki2.py
+├── main5_kaiki3.py
+├── main5_kaikib.py
+├── main5_kaikismo.py
+├── main5_kaikismosei_XY.py
+├── main5_kaikismosei.py
+├── main5_kaikismosei2.py
+├── main5_kaikismosei2cv.py
+├── main5_kaikismosei2dev.py
+├── main5_kaikismoseiv.py
+├── main5_kaikismov2.backuppy
+├── main5_multi.py
+├── main5.py
+├── main5dev.py
+├── main5k_ale.py
+└── main5k_ale2.py
+
+
+
+
+■main5.py (分類)
+new_base_env) PS G:\共有ドライブ\GAP_長寿研\user\iwamoto\視線の動きの俊敏さ> python main5.py -h                  
+usage: main5.py [-h] [--cv] [--smote] [--no-smote] [--undersampling] [--simple-undersampling]
+                [--base-model {lightgbm,xgboost,random_forest,catboost}] [--n-bags N_BAGS] [--splits SPLITS]
+                [--model {lightgbm,xgboost,random_forest,catboost}] [--random-state RANDOM_STATE] [--data-path DATA_PATH]
+                [--data-file DATA_FILE] [--output-dir OUTPUT_DIR] [--viz-only] [--no-pdp] [--no-save] [--no-organize]
+
+
+
+options:
+  -h, --help            show this help message and exit
+  --cv                  交差検証を実行する
+  --smote               SMOTEを使用する
+  --no-smote            SMOTEを使用しない
+  --undersampling       UndersamplingBaggingを使用する
+  --simple-undersampling
+                        シンプルなアンダーサンプリング（バギングなし）を使用する
+  --base-model {lightgbm,xgboost,random_forest,catboost}
+                        UndersamplingBaggingで使用するベースモデル
+  --n-bags N_BAGS       UndersamplingBaggingのバッグ数
+  --splits SPLITS       交差検証の分割数
+  --model {lightgbm,xgboost,random_forest,catboost}
+                        使用するモデル
+  --random-state RANDOM_STATE
+                        乱数シード
+  --data-path DATA_PATH
+                        データファイルのパス
+  --data-file DATA_FILE
+                        データファイル名
+  --output-dir OUTPUT_DIR
+                        結果出力ディレクトリ
+  --viz-only            可視化のみを実行（学習なし）
+  --no-pdp              部分依存グラフを作成しない
+  --no-save             プロットをファイルに保存しない
+  --no-organize         結果ファイルを整理しない
+
+■main5k_ale2.py(回帰)
+usage: main5k_ale2.py [-h] [--cv] [--bagging] [--base-model {lightgbm,xgboost,random_forest,catboost}] [--n-bags N_BAGS]   
+                      [--splits SPLITS] [--model {lightgbm,xgboost,random_forest,catboost}] [--random-state RANDOM_STATE]  
+                      [--data-path DATA_PATH] [--data-file DATA_FILE] [--target-column TARGET_COLUMN]
+                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
+                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
+usage: main5k_ale2.py [-h] [--cv] [--bagging] [--base-model {lightgbm,xgboost,random_forest,catboost}] [--n-bags N_BAGS]   
+                      [--splits SPLITS] [--model {lightgbm,xgboost,random_forest,catboost}] [--random-state RANDOM_STATE]  
+                      [--data-path DATA_PATH] [--data-file DATA_FILE] [--target-column TARGET_COLUMN]
+                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
+                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
+                      [--data-path DATA_PATH] [--data-file DATA_FILE] [--target-column TARGET_COLUMN]
+                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
+                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
+                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
+                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
+                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
+                      [--smote-n-bins SMOTE_N_BINS] [--smote-density-threshold SMOTE_DENSITY_THRESHOLD]
+                      [--smote-outlier-threshold SMOTE_OUTLIER_THRESHOLD] [--integer-smote] [--target-min TARGET_MIN]      
+                      [--target-max TARGET_MAX] [--no-pdp] [--pdp-n-features PDP_N_FEATURES]
+                      [--pdp-grid-resolution PDP_GRID_RESOLUTION] [--no-ale] [--ale-n-features ALE_N_FEATURES]
+                      [--ale-grid-resolution ALE_GRID_RESOLUTION] [--compare-ale-pdp]
+
+
+# 
+python main_pdp5.py --model lightgbm --data-path G:/共有ドライブ/GAP_長寿研/user/iwamoto/視線の動きの俊敏さ/data/features_train.csv --output-dir result
+
+
+python prediction.py --data-path 新しいデータのパス.csv --model-path 保存したモデルのディレクトリパス --output-path 予測結果の出力パス.csv
+
+
+
+# SMOTEメソッドを指定
+python main5_kaikidev.py --model catboost --smote --smote-method binning
+
+# SMOTE K-neighborsを設定
+python main5_kaikidev.py --model catboost --smote --smote-k-neighbors 7
+
+# SMOTE可視化
+python main5_kaikidev.py --model catboost --smote --smote-viz-comprehensive
+
+
+□回帰の	smoteaバージョン
+小数
+
+python main5_kaikismo.py
+models.regression_smotebackup
+
+整数
+
+python main5_kaikismosei.py
+models.regression_smote
+
+
+python main5k_ale2.py --smote --smote-k-neighbors 7 --smote-density-threshold 0.3　--no-pdp
