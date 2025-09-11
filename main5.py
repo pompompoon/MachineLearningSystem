@@ -31,21 +31,83 @@ from scipy.stats import chi2_contingency
 import pickle  # モデルの保存・読み込みに使用
 import datetime
 import shutil
+# from models.borderline_smote_processor import BorderlineSMOTEProcessor
+# 既存のモデルのインポート
+try:
+    from models.lightgbm_model import LightGBMModel
+    from models.xgboost_model import XGBoostModel
+    from models.random_forest_model import RandomForestModel
+    from models.catboost_model import CatBoostModel
+    from models.undersampling_bagging_model import UndersamplingBaggingModel
+    from models.undersampling_model import UndersamplingModel
+    from models.cross_validator import CrossValidator, run_cv_analysis, safe_convert_array
+    CLASSIFICATION_MODELS_AVAILABLE = True
+    print("🔧 DEBUG: CLASSIFICATION_MODELS_AVAILABLE = True")
+except ImportError as e:
+    CLASSIFICATION_MODELS_AVAILABLE = False
+    print(f"🔧 DEBUG: CLASSIFICATION_MODELS_AVAILABLE = False")
+    print(f"🔧 DEBUG: モデルインポートエラー: {e}")
 
-# モデルのインポート
-from models.lightgbm_model import LightGBMModel
-from models.xgboost_model import XGBoostModel
-from models.random_forest_model import RandomForestModel
-from models.catboost_model import CatBoostModel
-from models.undersampling_bagging_model import UndersamplingBaggingModel
-from models.undersampling_model import UndersamplingModel
-from models.cross_validator import CrossValidator, run_cv_analysis, safe_convert_array
+# 拡張機能のインポート（修正版）
+try:
+    from models.smotetomek_processor import SMOTETomekProcessor
+    from visualization.aleplotter import ALEPlotter
+    from models.enhanced_analysis_integration import EnhancedAnalysisRunner
+    ENHANCED_FEATURES_AVAILABLE = True
+    print("✓ 拡張機能（SMOTETomek & ALE）が利用可能です")
+except ImportError as e:
+    ENHANCED_FEATURES_AVAILABLE = False
+    print(f"⚠ 拡張機能が利用できません: {e}")
+    print("  models/smotetomek_processor.py, models/ale_plotter.py, models/enhanced_analysis_integration.py を確認してください")
 
 # 視線データ可視化クラスのインポート
-from visualization.eye_tracking_visualizer import EyeTrackingVisualizer
-from visualization.threshold_evaluator import ThresholdEvaluator
+try:
+    from visualization.eye_tracking_visualizer import EyeTrackingVisualizer
+    from visualization.threshold_evaluator import ThresholdEvaluator
+    VISUALIZATION_AVAILABLE = True
+except ImportError as e:
+    VISUALIZATION_AVAILABLE = False
+    print(f"⚠ 可視化機能が利用できません: {e}")
 
-from prediction import save_model  # prediction.pyから関数をインポート
+try:
+    from prediction import save_model  # prediction.pyから関数をインポート
+    PREDICTION_AVAILABLE = True
+except ImportError:
+    PREDICTION_AVAILABLE = False
+
+try:
+    from models.holdout_bunrui import ClassificationHoldoutCVAnalyzer, run_classification_holdout_cv_analysis
+    HOLDOUT_CV_AVAILABLE = True
+except ImportError:
+    print("🔧 DEBUG: HOLDOUT_CV_AVAILABLE = False")
+    HOLDOUT_CV_AVAILABLE = False
+def run_enhanced_comprehensive_analysis(df, model_class=None, output_dir='enhanced_result', 
+                                       random_state=42, data_file_name=None, **kwargs):
+    """
+    SMOTETomek + ALE + 従来手法の包括的比較分析を実行
+    """
+    if not ENHANCED_FEATURES_AVAILABLE:
+        print("エラー: 拡張機能が利用できません。")
+        print("models/smotetomek_processor.py, models/ale_plotter.py, models/enhanced_analysis_integration.py を確認してください。")
+        return None
+    
+    print("=== 包括的拡張分析開始 ===")
+    
+    # EnhancedAnalysisRunnerを使用
+    runner = EnhancedAnalysisRunner(output_dir, random_state)
+    
+    results = runner.run_comprehensive_analysis(
+        df=df,
+        model_class=model_class,
+        data_file_name=data_file_name,
+        use_baseline=True,
+        use_smote=True,
+        use_smotetomek=True,
+        use_ale=True,
+        **kwargs
+    )
+    
+    return results
 
 def calculate_specificity(y_true, y_pred):
     """特異度（Specificity）を計算する関数"""
@@ -170,9 +232,11 @@ def prepare_data(df):
     # featuresとtargetに加えて、id_columnも返す
     return features, target, id_column
 
-def train_model(features, target, id_column=None, model_class=None, use_smote=False, use_undersampling=False, 
-                use_simple_undersampling=False, random_state=42, **kwargs):
-    """モデルの学習を行う関数"""
+def train_model(features, target, id_column=None, model_class=None, use_smote=False, 
+                use_undersampling=False, use_simple_undersampling=False, 
+                use_smotetomek=False,  # 新しいパラメータ
+                random_state=42, **kwargs):
+    """モデルの学習を行う関数（SMOTETomek対応版）"""
     # データの分割
     if id_column is not None:
         # ID列も一緒に分割する
@@ -200,8 +264,39 @@ def train_model(features, target, id_column=None, model_class=None, use_smote=Fa
     X_train_orig = X_train.copy()
     X_test_orig = X_test.copy()
     
-    # SMOTEを適用する場合
-    if use_smote:
+    # SMOTETomekを適用する場合（新しい処理）
+    if use_smotetomek:
+        if not ENHANCED_FEATURES_AVAILABLE:
+            print("警告: SMOTETomek機能が利用できません。通常のSMOTEを使用します。")
+            use_smote = True
+            use_smotetomek = False
+        else:
+            print("SMOTETomekを適用してデータをバランシングします...")
+            
+            # SMOTETomekプロセッサーの作成
+            processor = SMOTETomekProcessor(
+                smote_sampling_strategy=kwargs.get('smotetomek_strategy', 'auto'),
+                smote_k_neighbors=kwargs.get('smotetomek_k_neighbors', 5),
+                tomek_sampling_strategy=kwargs.get('tomek_strategy', 'auto'),
+                random_state=random_state
+            )
+            
+            # リサンプリング実行
+            X_train_resampled, y_train_resampled, statistics = processor.fit_resample(
+                X_train_scaled, y_train, verbose=False
+            )
+            
+            X_train_scaled = pd.DataFrame(X_train_resampled, columns=features.columns)
+            y_train = pd.Series(y_train_resampled)
+            
+            print("SMOTETomek適用後のクラス分布:")
+            print(pd.Series(y_train).value_counts())
+            
+            # 統計情報を結果に含める
+            kwargs['smotetomek_statistics'] = statistics
+    
+    # SMOTEを適用する場合（既存の処理）
+    elif use_smote:
         from imblearn.over_sampling import SMOTE
         print("SMOTEを適用してデータをバランシングします...")
         smote = SMOTE(random_state=random_state)
@@ -211,7 +306,7 @@ def train_model(features, target, id_column=None, model_class=None, use_smote=Fa
         print("SMOTE適用後のクラス分布:")
         print(pd.Series(y_train).value_counts())
     
-    # UndersamplingBaggingを使用する場合
+    # UndersamplingBaggingを使用する場合（既存の処理）
     if use_undersampling:
         print("UndersamplingBaggingモデルを使用します...")
         base_model = kwargs.get('base_model', 'lightgbm')
@@ -301,8 +396,8 @@ def train_model(features, target, id_column=None, model_class=None, use_smote=Fa
     y_pred = best_model.predict(X_test_scaled)
     y_pred_proba = best_model.predict_proba(X_test_scaled)
     
-    # 結果辞書にid_testを追加
-    return {
+    # 結果辞書の作成
+    result = {
         'model': best_model,
         'predictions': y_pred,
         'prediction_proba': y_pred_proba,
@@ -320,6 +415,13 @@ def train_model(features, target, id_column=None, model_class=None, use_smote=Fa
         'id_test': id_test,  # テストデータのID列
         'scaler': scaler
     }
+    
+    # SMOTETomek統計情報を追加
+    if use_smotetomek and 'smotetomek_statistics' in kwargs:
+        result['smotetomek_statistics'] = kwargs['smotetomek_statistics']
+    
+    return result
+
 def evaluate_results(results):
     """結果の評価を行う関数（特異度と詳細評価を追加）"""
     # 特異度（Specificity）の計算
@@ -576,9 +678,12 @@ def organize_result_files(data_file_name, output_dir):
 
 
 def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling=False, 
-                       use_simple_undersampling=False, random_state=42, output_dir=None, 
-                       data_file_name=None, organize_files=True, evaluate_thresholds=True, **kwargs):
-    """単一の学習・評価を行う分析を実行する関数"""
+                       use_simple_undersampling=False, use_smotetomek=False, 
+                       random_state=42, output_dir=None, data_file_name=None, 
+                       organize_files=True, evaluate_thresholds=True,
+                       create_ale_plots=False, ale_features=5, ale_include_2d=False,
+                       ale_vs_pdp=False, **kwargs):
+    """単一の学習・評価を行う分析を実行する関数（拡張機能対応版）"""
     
     # 新しい出力ディレクトリをここで作成
     original_output_dir = output_dir  # 元の出力ディレクトリを保存
@@ -596,10 +701,13 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
         # interactionsとsaved_modelサブディレクトリも事前に作成
         interactions_dir = os.path.join(new_output_dir, "interactions")
         saved_model_dir = os.path.join(new_output_dir, "saved_model")
+        ale_dir = os.path.join(new_output_dir, "ale_analysis")  # ALE用ディレクトリも追加
         if not os.path.exists(interactions_dir):
             os.makedirs(interactions_dir)
         if not os.path.exists(saved_model_dir):
             os.makedirs(saved_model_dir)
+        if not os.path.exists(ale_dir):
+            os.makedirs(ale_dir)
             
         # 処理結果の出力先を新しいディレクトリに設定
         output_dir = new_output_dir
@@ -608,20 +716,31 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
     if 'Target' in df.columns and 'target' not in df.columns:
         df = df.rename(columns={'Target': 'target'})
     
+    # 使用手法の表示
+    method_description = []
     if use_undersampling:
         base_model = kwargs.get('base_model', 'lightgbm')
         n_bags = kwargs.get('n_bags', 10)
-        print(f"\nUsing UndersamplingBaggingModel with {base_model} base model and {n_bags} bags...")
+        method_description.append(f"UndersamplingBagging ({base_model}, {n_bags} bags)")
     elif use_simple_undersampling:
         base_model = kwargs.get('base_model', 'lightgbm')
-        print(f"\nUsing SimpleUndersamplingModel with {base_model} base model...")
+        method_description.append(f"SimpleUndersampling ({base_model})")
+    elif use_smotetomek:
+        if ENHANCED_FEATURES_AVAILABLE:
+            method_description.append("SMOTETomek (SMOTE + Tomek Links)")
+        else:
+            method_description.append("SMOTETomek (機能無効 - 通常SMOTE使用)")
+            use_smote = True
+            use_smotetomek = False
     elif model_class is not None:
-        print(f"\nUsing {model_class.__name__}...")
+        method_description.append(f"{model_class.__name__}")
     else:
-        raise ValueError("model_class、use_undersamplingまたはuse_simple_undersamplingのいずれかを指定してください。")
+        raise ValueError("model_class、use_undersampling、use_simple_undersampling、またはuse_smotetomekのいずれかを指定してください。")
     
-    if use_smote:
-        print("SMOTEを使用します")
+    if use_smote and not use_smotetomek:
+        method_description.append("SMOTE")
+    
+    print(f"\nUsing {', '.join(method_description)}...")
     
     print("データの前処理を開始...")
     try:
@@ -677,20 +796,26 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
     
     print("\nモデルの学習を開始...")
     try:
-        # id_columnも渡すように変更
+        # id_columnも渡すように変更、SMOTETomekパラメータも追加
         results = train_model(
-            features, target, id_column,
-            model_class=model_class, 
-            use_smote=use_smote, 
-            use_undersampling=use_undersampling,
-            use_simple_undersampling=use_simple_undersampling,
-            random_state=random_state,
-            **kwargs
-        )
+        features, target, id_column,
+        model_class=model_class, 
+        use_smote=use_smote, 
+        use_undersampling=use_undersampling,
+        use_simple_undersampling=use_simple_undersampling,
+        use_smotetomek=use_smotetomek,  # use_smotetomekを直接使用
+        random_state=random_state,
+        smotetomek_strategy=kwargs.get('smotetomek_strategy', 'auto'),
+        smotetomek_k_neighbors=kwargs.get('smotetomek_k_neighbors', 5),
+        tomek_strategy=kwargs.get('tomek_strategy', 'auto'),
+        base_model=kwargs.get('base_model', 'lightgbm'),
+        n_bags=kwargs.get('n_bags', 5)
+        )   
+        
     except TypeError as e:
         # 古い関数シグネチャとの互換性を保つ
         if "got an unexpected keyword argument" in str(e) or "takes" in str(e) and "positional argument" in str(e):
-            print("警告: 古い関数シグネチャを使用します（id_columnなし）")
+            print("警告: 古い関数シグネチャを使用します（id_columnまたはSMOTETomekなし）")
             results = train_model(
                 features, target,
                 model_class=model_class, 
@@ -714,10 +839,15 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
         model_name = f"usbag_{kwargs.get('base_model', 'lightgbm')}"
     elif use_simple_undersampling:
         model_name = f"usimple_{kwargs.get('base_model', 'lightgbm')}"
+    elif use_smotetomek:
+        if ENHANCED_FEATURES_AVAILABLE:
+            model_name = f"smotetomek_{results['model'].__class__.__name__.lower()}"
+        else:
+            model_name = f"smote_{results['model'].__class__.__name__.lower()}"
     else:
         model_name = results['model'].__class__.__name__.lower()
         
-    smote_suffix = "_smote" if use_smote else ""
+    smote_suffix = "_smote" if use_smote and not use_smotetomek else ""
     
     print("\n結果の評価を開始...")
     predictions_df, metrics = evaluate_results(results)
@@ -751,7 +881,8 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
             print(f"閾値評価中にエラーが発生しました: {e}")
             import traceback
             traceback.print_exc()
-        # 再現率と特異度の閾値による変化の可視化
+    
+    # 再現率と特異度の閾値による変化の可視化
     print("\n再現率と特異度の閾値による変化を可視化...")
     try:
         # データの準備
@@ -930,6 +1061,56 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
         import traceback
         traceback.print_exc()
     
+    # ALEプロット作成（新機能）
+    if create_ale_plots and ENHANCED_FEATURES_AVAILABLE:
+        print("\nALE（Accumulated Local Effects）プロット作成中...")
+        try:
+            # ALEプロッター作成
+            ale_dir = os.path.join(output_dir, 'ale_analysis')
+            ale_plotter = ALEPlotter(
+                model=results['model'],
+                X=results['X_test'],
+                feature_names=list(results['features'].columns),
+                output_dir=ale_dir
+            )
+            
+            # ALE分析実行
+            ale_results = ale_plotter.create_ale_dashboard(
+                n_features=ale_features,
+                include_2d=ale_include_2d
+            )
+            
+            # ALE vs PDP比較
+            if ale_vs_pdp:
+                print("ALE vs PDP 比較分析中...")
+                top_features = ale_results['features_analyzed'][:min(3, len(ale_results['features_analyzed']))]
+                for feature in top_features:
+                    try:
+                        fig = ale_plotter.compare_ale_vs_pdp(feature)
+                        if fig:
+                            plt.close(fig)
+                    except Exception as e:
+                        print(f"ALE vs PDP比較エラー ({feature}): {e}")
+            
+            # 結果に追加
+            results['ale_analysis'] = ale_results
+            
+            # ALEレポート作成
+            from ale_plotter import create_ale_analysis_report
+            create_ale_analysis_report(ale_plotter, ale_results['features_analyzed'], ale_dir)
+            
+            print("ALE分析完了")
+            print(f"  1D プロット: {len(ale_results['ale_1d_plots'])}個")
+            print(f"  2D プロット: {len(ale_results['ale_2d_plots'])}個")
+            
+        except Exception as e:
+            print(f"ALE分析中にエラーが発生しました: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    elif create_ale_plots and not ENHANCED_FEATURES_AVAILABLE:
+        print("警告: ALE機能が利用できません。ale_plotter.pyを確認してください。")
+    
     # 結果の表示
     print("\n最適なパラメータ:")
     for param, value in results['best_params'].items():
@@ -941,6 +1122,16 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
     
     print("\n特徴量の重要度（上位10件）:")
     print(results['feature_importance'].head(10))
+    
+    # SMOTETomek統計の表示
+    if use_smotetomek and 'smotetomek_statistics' in results:
+        print("\nSMOTETomek統計:")
+        stats = results['smotetomek_statistics']
+        print(f"  元データサイズ: {stats['original_size']}")
+        print(f"  処理後サイズ: {stats['resampled_size']}")
+        print(f"  変化: {stats['size_change']:+d}")
+        print(f"  元クラス分布: {stats['original_class_counts']}")
+        print(f"  処理後クラス分布: {stats['resampled_class_counts']}")
     
     # 結果の可視化
     print("\nモデル評価の可視化...")
@@ -985,6 +1176,19 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
             with open(params_path, 'w') as f:
                 for param, value in results['best_params'].items():
                     f.write(f"{param}: {value}\n")
+                
+                # SMOTETomek統計も保存
+                if use_smotetomek and 'smotetomek_statistics' in results:
+                    f.write(f"\n=== SMOTETomek統計 ===\n")
+                    stats = results['smotetomek_statistics']
+                    f.write(f"元データサイズ: {stats['original_size']}\n")
+                    f.write(f"処理後サイズ: {stats['resampled_size']}\n")
+                    f.write(f"変化: {stats['size_change']}\n")
+                    f.write(f"元クラス分布: {stats['original_class_counts']}\n")
+                    f.write(f"処理後クラス分布: {stats['resampled_class_counts']}\n")
+                    f.write(f"SMOTE設定: {stats['smote_settings']}\n")
+                    f.write(f"Tomek設定: {stats['tomek_settings']}\n")
+            
             print(f"最適パラメータを保存しました: {params_path}")
         except Exception as e:
             print(f"最適パラメータの保存中にエラーが発生しました: {e}")
@@ -1011,6 +1215,34 @@ def run_simple_analysis(df, model_class=None, use_smote=False, use_undersampling
     
     # 必ず2つの値を返す
     return results, new_output_dir
+
+def run_enhanced_comprehensive_analysis(df, model_class=None, output_dir='enhanced_result', 
+                                       random_state=42, data_file_name=None, **kwargs):
+    """
+    SMOTETomek + ALE + 従来手法の包括的比較分析を実行
+    """
+    if not ENHANCED_FEATURES_AVAILABLE:
+        print("エラー: 拡張機能が利用できません。")
+        print("smotetomek_processor.py, ale_plotter.py, enhanced_analysis_integration.py を確認してください。")
+        return None
+    
+    print("=== 包括的拡張分析開始 ===")
+    
+    # EnhancedAnalysisRunnerを使用
+    runner = EnhancedAnalysisRunner(output_dir, random_state)
+    
+    results = runner.run_comprehensive_analysis(
+        df=df,
+        model_class=model_class,
+        data_file_name=data_file_name,
+        use_baseline=True,
+        use_smote=True,
+        use_smotetomek=True,
+        use_ale=True,
+        **kwargs
+    )
+    
+    return results
 
 def visualize_top_features(results, visualizer, n_top=5):
     """
@@ -1138,9 +1370,18 @@ def run_cv_analysis_with_smote(df, model_class=None, n_splits=5, use_smote=False
     
     print(f"\nCrossValidator を使用した {n_splits}分割交差検証を開始...{smote_str}{undersampling_str}")
     
-    # データの前処理
+    # データの前処理（修正版：3つの値を受け取る）
     print("データの前処理を開始...")
-    features, target = prepare_data(df)
+    try:
+        features, target, id_column = prepare_data(df)
+    except ValueError as e:
+        if "too many values to unpack" in str(e):
+            # 古いprepare_data関数との互換性
+            print("警告: 古いprepare_data関数を使用しています")
+            features, target = prepare_data(df)
+            id_column = None
+        else:
+            raise
     
     # データが空の場合はエラー
     if len(features) == 0 or len(target) == 0:
@@ -1155,7 +1396,15 @@ def run_cv_analysis_with_smote(df, model_class=None, n_splits=5, use_smote=False
     
     # 特徴量と目的変数の関係の可視化
     print("\n特徴量と目的変数の関係を分析します...")
-    visualizer.visualize_feature_target_relationships(features, target)
+    try:
+        if hasattr(visualizer, 'plot_feature_correlations'):
+            visualizer.plot_feature_correlations(features, target)
+        elif hasattr(visualizer, 'visualize_feature_target_relationships'):
+            visualizer.visualize_feature_target_relationships(features, target)
+        else:
+            print("警告: 特徴量と目的変数の関係を分析するメソッドが見つかりません。")
+    except Exception as e:
+        print(f"特徴量可視化中にエラー: {e}")
     
     # 元のデータに視線追跡データが含まれている場合はサッカードの可視化も行う
     has_saccade = any('saccade' in col.lower() for col in df.columns)
@@ -1163,7 +1412,10 @@ def run_cv_analysis_with_smote(df, model_class=None, n_splits=5, use_smote=False
     
     if has_saccade:
         print("\nサッカード特徴量の分析を行います...")
-        visualizer.visualize_saccade_features(df)
+        try:
+            visualizer.visualize_saccade_features(df)
+        except Exception as e:
+            print(f"サッカード分析中にエラー: {e}")
     
     if has_eye_tracking:
         print("\n視線軌跡の分析を行います...")
@@ -1180,14 +1432,19 @@ def run_cv_analysis_with_smote(df, model_class=None, n_splits=5, use_smote=False
         print(f"UndersamplingBaggingModelを使用した交差検証を実行します（ベースモデル: {base_model}、バッグ数: {n_bags}）")
         
         # UndersamplingBaggingModelのクラスメソッドを使用
-        oof_preds, scores = UndersamplingBaggingModel.run_cv(
-            X=features, 
-            y=target, 
-            base_model=base_model,
-            n_bags=n_bags,
-            n_splits=n_splits,
-            random_state=random_state
-        )
+        try:
+            from models.undersampling_bagging_model import UndersamplingBaggingModel
+            oof_preds, scores = UndersamplingBaggingModel.run_cv(
+                X=features, 
+                y=target, 
+                base_model=base_model,
+                n_bags=n_bags,
+                n_splits=n_splits,
+                random_state=random_state
+            )
+        except ImportError as e:
+            print(f"UndersamplingBaggingModelのインポートエラー: {e}")
+            return None, None
         
         # 結果の表示
         print("\n交差検証の結果:")
@@ -1219,13 +1476,18 @@ def run_cv_analysis_with_smote(df, model_class=None, n_splits=5, use_smote=False
         print(f"シンプルアンダーサンプリングモデルを使用した交差検証を実行します（ベースモデル: {base_model}）")
         
         # UndersamplingModelのクラスメソッドを使用
-        oof_preds, scores = UndersamplingModel.run_cv(
-            X=features, 
-            y=target, 
-            base_model=base_model,
-            n_splits=n_splits,
-            random_state=random_state
-        )
+        try:
+            from models.undersampling_model import UndersamplingModel
+            oof_preds, scores = UndersamplingModel.run_cv(
+                X=features, 
+                y=target, 
+                base_model=base_model,
+                n_splits=n_splits,
+                random_state=random_state
+            )
+        except ImportError as e:
+            print(f"UndersamplingModelのインポートエラー: {e}")
+            return None, None
         
         # 結果の表示
         print("\n交差検証の結果:")
@@ -1252,32 +1514,47 @@ def run_cv_analysis_with_smote(df, model_class=None, n_splits=5, use_smote=False
         return None, scores  # CrossValidatorの代わりに結果のみを返す
     
     # 通常のCrossValidatorを使用する場合
-    # CrossValidator の設定と実行
-    validator = CrossValidator(n_splits=n_splits, random_state=random_state)
-    
-    # SMOTEを使用する場合は、CrossValidatorクラスに処理を追加する必要があります
-    # このコードでは簡易的にrun_cross_validationメソッドを直接呼び出します
-    if use_smote:
-        print("注意: CrossValidatorクラスでSMOTEはサポートされていません。")
-        print("SMOTEを適用するには、CrossValidatorクラスを修正する必要があります。")
-    
-    # 交差検証の実行
-    results = validator.run_cross_validation(features, target, model_class)
-    
-    # 結果の表示と可視化
-    validator.print_results()
-    validator.plot_results()
-    
-    # 結果の保存
-    model_name = model_class.__name__.lower()
-    smote_suffix = "_smote" if use_smote else ""
-    validator.save_results(
-        prefix=f'cv_{model_name}{smote_suffix}_{n_splits}fold',
-        output_dir=output_dir
-    )
-    
-    return validator, results
-
+    try:
+        from models.cross_validator import CrossValidator
+        
+        # CrossValidator の設定と実行
+        validator = CrossValidator(n_splits=n_splits, random_state=random_state)
+        
+        # SMOTEを使用する場合は、CrossValidatorクラスに処理を追加する必要があります
+        # このコードでは簡易的にrun_cross_validationメソッドを直接呼び出します
+        if use_smote:
+            print("注意: CrossValidatorクラスでSMOTEはサポートされていません。")
+            print("SMOTEを適用するには、CrossValidatorクラスを修正する必要があります。")
+        
+        # 交差検証の実行
+        if model_class is None:
+            print("エラー: model_classが指定されていません。")
+            return None, None
+            
+        results = validator.run_cross_validation(features, target, model_class)
+        
+        # 結果の表示と可視化
+        validator.print_results()
+        validator.plot_results()
+        
+        # 結果の保存
+        model_name = model_class.__name__.lower()
+        smote_suffix = "_smote" if use_smote else ""
+        validator.save_results(
+            prefix=f'cv_{model_name}{smote_suffix}_{n_splits}fold',
+            output_dir=output_dir
+        )
+        
+        return validator, results
+        
+    except ImportError as e:
+        print(f"CrossValidatorのインポートエラー: {e}")
+        return None, None
+    except Exception as e:
+        print(f"CrossValidator実行中にエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
 
 def create_usbag_model(base_model='lightgbm', n_bags=10, random_state=42):
     """UndersamplingBaggingModelを作成するヘルパー関数"""
@@ -1312,6 +1589,8 @@ def create_simple_us_model(base_model='lightgbm', random_state=42):
 if __name__ == "__main__":
     # コマンドライン引数の設定
     parser = argparse.ArgumentParser(description='視線追跡データを用いた機械学習モデルの実行')
+    
+    # 既存の基本引数
     parser.add_argument('--cv', action='store_true', help='交差検証を実行する')
     parser.add_argument('--smote', action='store_true', help='SMOTEを使用する')
     parser.add_argument('--no-smote', dest='smote', action='store_false', help='SMOTEを使用しない')
@@ -1330,7 +1609,7 @@ if __name__ == "__main__":
                        default="data",
                        help='データファイルのパス')
     parser.add_argument('--data-file', type=str, 
-                       default="長文字eye_movement_features_小b.csv",
+                       default="cyozyuken_b_noeye.csv",
                        help='データファイル名')
     parser.add_argument('--output-dir', type=str, 
                        default="result",
@@ -1340,9 +1619,49 @@ if __name__ == "__main__":
     parser.add_argument('--no-save', dest='save_plots', action='store_false', help='プロットをファイルに保存しない')
     parser.add_argument('--no-organize', dest='organize_files', action='store_false', 
                         help='結果ファイルを整理しない')
+    parser.add_argument('--holdout-cv', action='store_true', help='テストデータ保持+CVを実行')
+    
+    # SMOTETomek関連の引数（新機能）
+    parser.add_argument('--smotetomek', action='store_true', 
+                       help='SMOTETomekを使用する（SMOTEとTomek Linksの組み合わせ）')
+    parser.add_argument('--smotetomek-k-neighbors', type=int, default=5,
+                       help='SMOTETomekのSMOTE部分で使用する近傍数 (default: 5)')
+    parser.add_argument('--smotetomek-strategy', type=str, default='auto',
+                       choices=['auto', 'minority', 'majority'],
+                       help='SMOTETomekのサンプリング戦略 (default: auto)')
+    parser.add_argument('--tomek-strategy', type=str, default='auto',
+                       choices=['auto', 'majority', 'all'],
+                       help='Tomek Linksのサンプリング戦略 (default: auto)')
+    
+    # ALE関連の引数（新機能）
+    parser.add_argument('--ale-plots', action='store_true',
+                       help='ALE（Accumulated Local Effects）プロットを作成する')
+    parser.add_argument('--ale-features', type=int, default=5,
+                       help='ALE分析する上位特徴量数 (default: 5)')
+    parser.add_argument('--ale-include-2d', action='store_true',
+                       help='2次元ALEプロットも作成する')
+    parser.add_argument('--ale-vs-pdp', action='store_true',
+                       help='ALEとPDPの比較プロットを作成する')
+    
+    # 拡張分析関連の引数（新機能）
+    parser.add_argument('--enhanced-analysis', action='store_true',
+                       help='SMOTETomek + ALE + 従来手法の包括的比較分析を実行')
+    parser.add_argument('--compare-all-methods', action='store_true',
+                       help='ベースライン、SMOTE、SMOTETomekの全手法を比較')
+    
+    # デフォルト設定
     parser.set_defaults(smote=False, undersampling=False, simple_undersampling=False, 
                        pdp=True, save_plots=True, viz_only=False, organize_files=True)
-    
+    # コマンドライン引数の追加
+    parser.add_argument('--borderline-smote', action='store_true',
+                    help='Borderline SMOTEを使用する')
+    parser.add_argument('--borderline-type', type=int, default=1, choices=[1, 2],
+                    help='Borderline-SMOTEのタイプ (1 or 2)')
+    parser.add_argument('--borderline-k-neighbors', type=int, default=5,
+                    help='Borderline SMOTEのk近傍数 (default: 5)')
+    parser.add_argument('--borderline-m-neighbors', type=int, default=10,
+                    help='Borderline SMOTE境界判定用近傍数 (default: 10)')
+        
     args = parser.parse_args()
     
     # 出力ディレクトリの設定
@@ -1410,6 +1729,9 @@ if __name__ == "__main__":
     elif args.simple_undersampling:
         model_class = None
         model_name = f"usimple_{args.base_model}"
+    elif args.smotetomek:
+        model_class = model_mapping[args.model]
+        model_name = f"smotetomek_{args.model}"
     else:
         model_class = model_mapping[args.model]
         model_name = args.model
@@ -1421,20 +1743,123 @@ if __name__ == "__main__":
         print(f"- バッグ数: {args.n_bags}")
     elif args.simple_undersampling:
         print(f"- モデル: シンプルアンダーサンプリング ({args.base_model})")
+    elif args.smotetomek:
+        print(f"- モデル: {args.model} with SMOTETomek")
     else:
         print(f"- モデル: {args.model}")
-    print(f"- SMOTE: {'あり' if args.smote else 'なし'}")
+    
+    print(f"- SMOTE: {'あり' if args.smote and not args.smotetomek else 'なし'}")
+    print(f"- SMOTETomek: {'あり' if args.smotetomek else 'なし'}")
+    if args.smotetomek:
+        print(f"  - SMOTE近傍数: {args.smotetomek_k_neighbors}")
+        print(f"  - SMOTETomek戦略: {args.smotetomek_strategy}")
+        print(f"  - Tomek戦略: {args.tomek_strategy}")
+    
     print(f"- 交差検証: {'あり' if args.cv else 'なし'}")
     if args.cv:
         print(f"- 交差検証分割数: {args.splits}")
+    
+    print(f"- ALEプロット: {'あり' if args.ale_plots else 'なし'}")
+    if args.ale_plots:
+        print(f"  - 分析特徴量数: {args.ale_features}")
+        print(f"  - 2次元ALE: {'あり' if args.ale_include_2d else 'なし'}")
+        print(f"  - ALE vs PDP比較: {'あり' if args.ale_vs_pdp else 'なし'}")
+    
+    print(f"- 拡張分析: {'あり' if args.enhanced_analysis else 'なし'}")
     print(f"- 部分依存グラフ: {'あり' if args.pdp else 'なし'}")
     print(f"- 乱数シード: {args.random_state}")
     print(f"- データファイル: {args.data_file}")
     print(f"- 結果ファイル整理: {'あり' if args.organize_files else 'なし'}")
     
+    # 拡張機能の利用可能性チェック
+    if (args.smotetomek or args.ale_plots or args.enhanced_analysis) and not ENHANCED_FEATURES_AVAILABLE:
+        print("\n警告: 拡張機能が要求されていますが利用できません")
+        print("必要なファイルを確認してください:")
+        print("- smotetomek_processor.py")
+        print("- ale_plotter.py") 
+        print("- enhanced_analysis_integration.py")
+        
+        if args.smotetomek:
+            print("SMOTETomekの代わりに通常のSMOTEを使用します")
+            args.smote = True
+            args.smotetomek = False
+        
+        if args.ale_plots:
+            print("ALEプロット機能は無効化されます")
+            args.ale_plots = False
+        
+        if args.enhanced_analysis:
+            print("拡張分析は実行できません")
+            args.enhanced_analysis = False
+    
     try:
         # 分析実行
-        if args.cv:
+        if args.enhanced_analysis:
+            # 包括的拡張分析（全手法比較 + ALE）
+            if not ENHANCED_FEATURES_AVAILABLE:
+                print("❌ 拡張分析が利用できません。通常分析を実行します。")
+                args.enhanced_analysis = False
+            else:
+                print("包括的拡張分析を実行します...")
+                results = run_enhanced_comprehensive_analysis(
+                    df=df,
+                    model_class=model_class,
+                    output_dir=output_dir,
+                    random_state=args.random_state,
+                    data_file_name=args.data_file,
+                    smotetomek_strategy=args.smotetomek_strategy,
+                    smotetomek_k_neighbors=args.smotetomek_k_neighbors,
+                    tomek_strategy=args.tomek_strategy
+                )
+                
+                if results and results.get('output_directory'):
+                    print(f"\n包括的拡張分析が完了しました。")
+                    print(f"結果は {results['output_directory']} に保存されています。")
+                    
+                    # サマリー表示
+                    summary = results.get('summary', {})
+                    if summary.get('best_method'):
+                        print(f"\n最良手法: {summary['best_method'].upper()}")
+                        print(f"最良F1スコア: {summary['best_f1_score']:.4f}")
+                exit(0)
+        
+        if args.holdout_cv:
+            # テストデータ保持+クロスバリデーション分析
+            if not HOLDOUT_CV_AVAILABLE:
+                print("❌ テストデータ保持+CVが利用できません。models/holdout_bunrui.pyファイルを確認してください。")
+                exit(1)
+            
+            print("テストデータ保持+クロスバリデーション分析を実行します...")
+            results = run_classification_holdout_cv_analysis(
+                df=df, 
+                model_class=model_class if not (args.undersampling or args.simple_undersampling) else None,
+                use_smote=args.smote,
+                use_undersampling=args.undersampling,
+                use_simple_undersampling=args.simple_undersampling,
+                n_splits=args.splits,
+                use_smotetomek=args.smotetomek,
+                smotetomek_strategy=args.smotetomek_strategy,
+                smotetomek_k_neighbors=args.smotetomek_k_neighbors,
+                tomek_strategy=args.tomek_strategy,
+                test_size=0.2,  # テストデータ割合
+                random_state=args.random_state,
+                data_file_name=args.data_file,
+                output_dir=output_dir,
+                evaluate_thresholds=True,  # 閾値評価を有効化
+                save_splits=True,  # 分割データの保存
+                base_model=args.base_model,
+                n_bags=args.n_bags,
+                use_borderline_smote=args.borderline_smote,
+                borderline_type=args.borderline_type,
+                borderline_k_neighbors=args.borderline_k_neighbors,
+                borderline_m_neighbors=args.borderline_m_neighbors,
+            )
+            
+            print(f"\nテストデータ保持+クロスバリデーション分析が完了しました。")
+            if results.get('output_dir'):
+                print(f"結果は {results['output_dir']} に保存されています。")
+                
+        elif args.cv:
             # CrossValidator を使用した交差検証
             validator, cv_results = run_cv_analysis_with_smote(
                 df, 
@@ -1458,23 +1883,58 @@ if __name__ == "__main__":
                 if output_dir:
                     print(f"結果は {output_dir} ディレクトリに保存されました。")
         else:
-            # 単一の学習・評価による分析
+            # 単一の学習・評価による分析（拡張機能対応）
             results, new_dir = run_simple_analysis(
                 df, 
                 model_class=model_class if not (args.undersampling or args.simple_undersampling) else None,
                 use_smote=args.smote,
                 use_undersampling=args.undersampling,
                 use_simple_undersampling=args.simple_undersampling,
+                use_smotetomek=args.smotetomek,  # 新パラメータ
                 random_state=args.random_state,
                 output_dir=output_dir,
                 data_file_name=args.data_file,
                 organize_files=args.organize_files,
+                create_ale_plots=args.ale_plots,  # ALE関連パラメータ
+                ale_features=args.ale_features,
+                ale_include_2d=args.ale_include_2d,
+                ale_vs_pdp=args.ale_vs_pdp,
+                smotetomek_strategy=args.smotetomek_strategy,  # SMOTETomekパラメータ
+                smotetomek_k_neighbors=args.smotetomek_k_neighbors,
+                tomek_strategy=args.tomek_strategy,
                 base_model=args.base_model,
-                n_bags=args.n_bags
+                n_bags=args.n_bags,
+                use_borderline_smote=args.borderline_smote,
+                borderline_type=args.borderline_type,
+                borderline_k_neighbors=args.borderline_k_neighbors,
+                borderline_m_neighbors=args.borderline_m_neighbors,
             )
             
             if new_dir:
                 print(f"\n単一モデルによる分析が完了しました。結果は {new_dir} に保存されています。")
+                
+                # 使用した手法のサマリー表示
+                print(f"\n使用した手法:")
+                if args.smotetomek:
+                    print(f"  - SMOTETomek (データバランシング + 境界クリーニング)")
+                elif args.smote:
+                    print(f"  - SMOTE (データバランシング)")
+                else:
+                    print(f"  - 元データ")
+                
+                if args.ale_plots:
+                    print(f"  - ALE分析 ({args.ale_features}特徴量)")
+                    if 'ale_analysis' in results:
+                        ale_info = results['ale_analysis']
+                        print(f"    * 1D プロット: {len(ale_info['ale_1d_plots'])}個")
+                        if args.ale_include_2d:
+                            print(f"    * 2D プロット: {len(ale_info['ale_2d_plots'])}個")
+                
+                # 性能サマリー表示
+                if 'predictions_df' in results:
+                    pred_df = results['predictions_df']
+                    accuracy = (pred_df['True_Label'] == pred_df['Predicted_Label']).mean()
+                    print(f"\n最終性能: 精度 = {accuracy:.4f}")
             else:
                 print("\n単一モデルによる分析が完了しました。")
                 if output_dir:
@@ -1484,3 +1944,16 @@ if __name__ == "__main__":
         print(f"\nエラーが発生しました: {e}")
         import traceback
         traceback.print_exc()
+        
+        # エラー時の推奨事項
+        print(f"\n推奨事項:")
+        print(f"1. データファイルの形式を確認してください")
+        print(f"2. 必要なライブラリがインストールされているか確認してください")
+        if args.smotetomek or args.ale_plots:
+            print(f"3. 拡張機能ファイルが正しく配置されているか確認してください:")
+            print(f"   - smotetomek_processor.py")
+            print(f"   - ale_plotter.py")
+            print(f"   - enhanced_analysis_integration.py")
+        print(f"4. --viz-only オプションで基本的な可視化のみ試してください")
+        
+        exit(1)
