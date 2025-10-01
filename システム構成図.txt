@@ -2,6 +2,9 @@ G:\共有ドライブ\GAP_長寿研\user\iwamoto\視線の動きの俊敏さ
 
 conda activate new_base_env
 
+環境構築：environment.yml
+
+
 
 視線の動きの俊敏さ/
 ├── data/
@@ -192,4 +195,6 @@ python main5_kaikismosei.py
 models.regression_smote
 
 
+
+python main5k_ale2.py --smote-method density --smote-k-neighbors 5 --smote-density-threshold 0.1 --no-pdp
 python main5k_ale2.py --smote --smote-k-neighbors 7 --smote-density-threshold 0.3　--no-pdp
