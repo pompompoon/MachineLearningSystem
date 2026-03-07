@@ -1,200 +1,157 @@
-G:\共有ドライブ\GAP_長寿研\user\iwamoto\視線の動きの俊敏さ
+# 機械学習パイプライン — 分類・回帰分析システム
 
+表形式データに対する分類・回帰タスクを、複数のGBDTモデル（LightGBM / XGBoost / CatBoost / RandomForest）で実行できる機械学習パイプラインです。不均衡データ対策、モデル解釈、交差検証、結果の可視化までを一貫して行えます。
+
+## 主な機能
+
+- **複数モデル対応**: LightGBM, XGBoost, CatBoost, RandomForest を統一インターフェースで切り替え可能
+- **不均衡データ対策**: SMOTE（Borderline-SMOTE / SMOTETomek 含む）、Undersampling、Undersampling Bagging
+- **回帰用SMOTE**: binning / density / outliers の3手法に対応。整数値SMOTEにも対応
+- **モデル解釈**: ALE（Accumulated Local Effects）、PDP（Partial Dependence Plot）、ICE
+- **交差検証**: Holdout / K-Fold に対応
+- **結果管理**: 実行結果の自動整理・保存
+
+## ディレクトリ構成
+
+```
+├── data/                        # 入力データ
+├── feature_generation/          # 特徴量生成
+│   ├── extractioncondition/     # 抽出条件（フィルタ等）
+│   └── fdata/                   # 特徴量生成スクリプト群
+├── models/                      # モデル実装
+├── visualization/               # 可視化・評価ツール
+├── pretreatment/                # 前処理（クラスタリング、UMAP等）
+├── result/                      # 実行結果出力先
+├── main5.py                     # エントリーポイント（分類）
+├── main5k_ale2.py               # エントリーポイント（回帰）
+└── environment.yml              # conda環境定義
+```
+
+## セットアップ
+
+```bash
+conda env create -f environment.yml
 conda activate new_base_env
+```
 
-環境構築：environment.yml
+## 使い方
 
+### 分類（main5.py）
 
+```bash
+# 基本実行
+python main5.py --model lightgbm --data-path data/features_train.csv --output-dir result
 
-視線の動きの俊敏さ/
-├── data/
-├── feature_generation/
-│   ├── extractioncondition/
-│   │   ├── __pycache__/
-│   │   │   └── sensitivityfilter.cpython-312.pyc
-│   │   └── sensitivityfilter.py
-│   └── fdata/特徴量生成後データ
-│       ├── All_EyeCenterAngle_all.py
-│       ├── EyeCenterAngle_all.py
-│       ├── MainEyecenter_saccade_angleV.py
-│       ├── MainEyeCenterAngle_Eyestd.py
-│       ├── MainEyeCenterAngle_Nosaccade.py
-│       ├── MainEyeCenterAngle.py
-│       ├── microsaccade_EyeCenterAngle_all.py
-│       ├── saccade_EyeCenterAngle_-5s.py
-│       ├── saccade_EyeCenterAngle_all.py
-│       ├── saccade_RotatedEyeCenter_all - コピー.py
-│       ├── saccade_RotatedEyeCenter_all.py
-│       └── saccade_velo.py
-├── models/実装したアルゴリズム等
-│   ├── __pycache__/
-│   ├── __init__.py
-│   ├── __init__copy.py
-│   ├── ale_plotter.py
-│   ├── base_model - 0219.py
-│   ├── base_model.py
-│   ├── catboost_model.py
-│   ├── catboost_regression_model.py
-│   ├── cross_validator.py
-│   ├── cross_validator.py.b.py
-│   ├── file-organizer.py
-│   ├── lightgbm_model.py
-│   ├── new_pdp_noice.py
-│   ├── new_pdp.py
-│   ├── partial_dependence_plotter_kaiki.py
-│   ├── partial_dependence_plotter_kaikide...py
-│   ├── partial_dependence_plotter.py
-│   ├── partial_dependence_plotter.pybacku...py
-│   ├── random_forest_model.py
-│   ├── regression_models.py
-│   ├── regression_smote.py
-│   ├── regression_smotebackup.py
-│   ├── RegressionResultManager.py
-│   ├── rusboost_model.py
-│   ├── simplecatboost.py
-│   ├── undersampling_bagging_model.py
-│   ├── undersampling_model.py
-│   ├── xgboost_model.py
-│   └── xgboost_regression_model.py
-├── visualization/可視化・評価ツール
-│   ├── __pycache__/
-│   ├── __init__.py
-│   ├── eye_tracking_visualizer.py
-│   ├── eye_tracking_visualizer.py.back.py
-│   ├── eye_tracking_visualizer.pyb
-│   ├── model_evaluator.py
-│   ├── regression_ice.py
-│   ├── regression_model_evaluator.py
-│   ├── regression_pdp_handler.py
-│   ├── regression_visualizer.bupy
-│   ├── regression_visualizer.py
-│   ├── smote_visualization.py
-│   ├── threshold_evaluator.py
-│   └── threshold_evaluator2.py
-├── pretreatment/前処理ツール
-│   ├── cluster_features.png
-│   ├── elbow_method.png
-│   ├── join.ipynb
-│   ├── kmeans_clusters.png
-│   └── umap.ipynb
-├── result/モデルを実行した後の結果
-├── saccade_features/
-├── main - コピー.py
-├── main_icek.py
-├── main_kaiki3.py
-├── main_pdp6.py
-├── main.py
-├── main5_kaiki.py
-├── main5_kaiki2.py
-├── main5_kaiki3.py
-├── main5_kaikib.py
-├── main5_kaikismo.py
-├── main5_kaikismosei_XY.py
-├── main5_kaikismosei.py
-├── main5_kaikismosei2.py
-├── main5_kaikismosei2cv.py
-├── main5_kaikismosei2dev.py
-├── main5_kaikismoseiv.py
-├── main5_kaikismov2.backuppy
-├── main5_multi.py
-├── main5.py
-├── main5dev.py
-├── main5k_ale.py
-└── main5k_ale2.py
+# SMOTE + 交差検証
+python main5.py --model catboost --smote --cv --splits 5
 
+# Undersampling Bagging
+python main5.py --undersampling --base-model xgboost --n-bags 10
 
+# 可視化のみ（学習なし）
+python main5.py --viz-only
+```
 
+#### オプション一覧
 
-■main5.py (分類)
-new_base_env) PS G:\共有ドライブ\GAP_長寿研\user\iwamoto\視線の動きの俊敏さ> python main5.py -h                  
-usage: main5.py [-h] [--cv] [--smote] [--no-smote] [--undersampling] [--simple-undersampling]
-                [--base-model {lightgbm,xgboost,random_forest,catboost}] [--n-bags N_BAGS] [--splits SPLITS]
-                [--model {lightgbm,xgboost,random_forest,catboost}] [--random-state RANDOM_STATE] [--data-path DATA_PATH]
-                [--data-file DATA_FILE] [--output-dir OUTPUT_DIR] [--viz-only] [--no-pdp] [--no-save] [--no-organize]
+| オプション | 説明 |
+|---|---|
+| `--model` | 使用モデル（`lightgbm`, `xgboost`, `random_forest`, `catboost`） |
+| `--cv` | 交差検証を実行 |
+| `--splits` | 交差検証の分割数 |
+| `--smote` / `--no-smote` | SMOTEの使用有無 |
+| `--undersampling` | Undersampling Bagging を使用 |
+| `--simple-undersampling` | バギングなしのアンダーサンプリング |
+| `--base-model` | Undersampling Bagging のベースモデル |
+| `--n-bags` | バッグ数 |
+| `--random-state` | 乱数シード |
+| `--data-path` / `--data-file` | 入力データの指定 |
+| `--output-dir` | 結果出力ディレクトリ |
+| `--viz-only` | 可視化のみ実行（学習スキップ） |
+| `--no-pdp` | PDPを作成しない |
+| `--no-save` | プロットを保存しない |
+| `--no-organize` | 結果ファイルを整理しない |
 
+### 回帰（main5k_ale2.py）
 
+```bash
+# 基本実行
+python main5k_ale2.py --model catboost --data-path data/features_train.csv --output-dir result
 
-options:
-  -h, --help            show this help message and exit
-  --cv                  交差検証を実行する
-  --smote               SMOTEを使用する
-  --no-smote            SMOTEを使用しない
-  --undersampling       UndersamplingBaggingを使用する
-  --simple-undersampling
-                        シンプルなアンダーサンプリング（バギングなし）を使用する
-  --base-model {lightgbm,xgboost,random_forest,catboost}
-                        UndersamplingBaggingで使用するベースモデル
-  --n-bags N_BAGS       UndersamplingBaggingのバッグ数
-  --splits SPLITS       交差検証の分割数
-  --model {lightgbm,xgboost,random_forest,catboost}
-                        使用するモデル
-  --random-state RANDOM_STATE
-                        乱数シード
-  --data-path DATA_PATH
-                        データファイルのパス
-  --data-file DATA_FILE
-                        データファイル名
-  --output-dir OUTPUT_DIR
-                        結果出力ディレクトリ
-  --viz-only            可視化のみを実行（学習なし）
-  --no-pdp              部分依存グラフを作成しない
-  --no-save             プロットをファイルに保存しない
-  --no-organize         結果ファイルを整理しない
+# SMOTE（density法）+ ALEのみ
+python main5k_ale2.py --smote --smote-method density --smote-k-neighbors 5 --smote-density-threshold 0.1 --no-pdp
 
-■main5k_ale2.py(回帰)
-usage: main5k_ale2.py [-h] [--cv] [--bagging] [--base-model {lightgbm,xgboost,random_forest,catboost}] [--n-bags N_BAGS]   
-                      [--splits SPLITS] [--model {lightgbm,xgboost,random_forest,catboost}] [--random-state RANDOM_STATE]  
-                      [--data-path DATA_PATH] [--data-file DATA_FILE] [--target-column TARGET_COLUMN]
-                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
-                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
-usage: main5k_ale2.py [-h] [--cv] [--bagging] [--base-model {lightgbm,xgboost,random_forest,catboost}] [--n-bags N_BAGS]   
-                      [--splits SPLITS] [--model {lightgbm,xgboost,random_forest,catboost}] [--random-state RANDOM_STATE]  
-                      [--data-path DATA_PATH] [--data-file DATA_FILE] [--target-column TARGET_COLUMN]
-                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
-                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
-                      [--data-path DATA_PATH] [--data-file DATA_FILE] [--target-column TARGET_COLUMN]
-                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
-                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
-                      [--output-dir OUTPUT_DIR] [--no-save] [--no-organize] [--smote]
-                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
-                      [--smote-method {binning,density,outliers}] [--smote-k-neighbors SMOTE_K_NEIGHBORS]
-                      [--smote-n-bins SMOTE_N_BINS] [--smote-density-threshold SMOTE_DENSITY_THRESHOLD]
-                      [--smote-outlier-threshold SMOTE_OUTLIER_THRESHOLD] [--integer-smote] [--target-min TARGET_MIN]      
-                      [--target-max TARGET_MAX] [--no-pdp] [--pdp-n-features PDP_N_FEATURES]
-                      [--pdp-grid-resolution PDP_GRID_RESOLUTION] [--no-ale] [--ale-n-features ALE_N_FEATURES]
-                      [--ale-grid-resolution ALE_GRID_RESOLUTION] [--compare-ale-pdp]
+# SMOTE（binning法）
+python main5k_ale2.py --model catboost --smote --smote-method binning
 
+# ALE と PDP を比較
+python main5k_ale2.py --compare-ale-pdp
+```
 
-# 
-python main_pdp5.py --model lightgbm --data-path G:/共有ドライブ/GAP_長寿研/user/iwamoto/視線の動きの俊敏さ/data/features_train.csv --output-dir result
+#### 回帰固有オプション
 
+| オプション | 説明 |
+|---|---|
+| `--target-column` | 目的変数のカラム名 |
+| `--bagging` | バギングを使用 |
+| `--smote-method` | 回帰用SMOTE手法（`binning`, `density`, `outliers`） |
+| `--smote-k-neighbors` | SMOTEのk近傍数 |
+| `--smote-n-bins` | binning法のビン数 |
+| `--smote-density-threshold` | density法の閾値 |
+| `--smote-outlier-threshold` | outlier法の閾値 |
+| `--integer-smote` | 整数値SMOTEを使用 |
+| `--target-min` / `--target-max` | 目的変数の範囲制約 |
+| `--no-ale` / `--ale-n-features` | ALEプロットの制御 |
+| `--pdp-n-features` / `--pdp-grid-resolution` | PDPの制御 |
+| `--compare-ale-pdp` | ALEとPDPを比較表示 |
 
-python prediction.py --data-path 新しいデータのパス.csv --model-path 保存したモデルのディレクトリパス --output-path 予測結果の出力パス.csv
+## モジュール構成
 
+### models/ — モデル・学習ロジック
 
+| ファイル | 役割 |
+|---|---|
+| `base_model.py` | 全モデルの基底クラス |
+| `lightgbm_model.py` | LightGBM分類モデル |
+| `xgboost_model.py` / `xgboost_regression_model.py` | XGBoost（分類/回帰） |
+| `catboost_model.py` / `catboost_regression_model.py` | CatBoost（分類/回帰） |
+| `random_forest_model.py` | RandomForest分類モデル |
+| `regression_models.py` | 回帰モデル共通処理 |
+| `cross_validator.py` | 交差検証 |
+| `regression_smote.py` | 回帰用SMOTE（整数対応） |
+| `undersampling_bagging_model.py` | Undersampling Bagging |
+| `undersampling_model.py` | シンプルアンダーサンプリング |
+| `ale_plotter.py` | ALEプロット生成 |
+| `partial_dependence_plotter.py` / `new_pdp.py` | PDPプロット生成 |
+| `RegressionResultManager.py` | 回帰結果の管理・保存 |
 
-# SMOTEメソッドを指定
-python main5_kaikidev.py --model catboost --smote --smote-method binning
+### visualization/ — 可視化・評価
 
-# SMOTE K-neighborsを設定
-python main5_kaikidev.py --model catboost --smote --smote-k-neighbors 7
+| ファイル | 役割 |
+|---|---|
+| `model_evaluator.py` | 分類モデルの評価（混同行列、各種メトリクス等） |
+| `regression_model_evaluator.py` | 回帰モデルの評価（RMSE、R²等） |
+| `regression_visualizer.py` | 回帰結果の可視化 |
+| `regression_pdp_handler.py` / `regression_ice.py` | PDP / ICE プロット |
+| `smote_visualization.py` | SMOTE適用結果の可視化 |
+| `threshold_evaluator.py` | 閾値評価 |
+| `eye_tracking_visualizer.py` | データ可視化 |
 
-# SMOTE可視化
-python main5_kaikidev.py --model catboost --smote --smote-viz-comprehensive
+### feature_generation/ — 特徴量生成
 
+- `extractioncondition/` — データ抽出条件の定義（フィルタリング）
+- `fdata/` — 各種特徴量生成スクリプト
 
-□回帰の	smoteaバージョン
-小数
+### pretreatment/ — 前処理
 
-python main5_kaikismo.py
-models.regression_smotebackup
+- K-Meansクラスタリング、UMAPによる次元削減・データ探索
 
-整数
+## 技術スタック
 
-python main5_kaikismosei.py
-models.regression_smote
-
-
-
-python main5k_ale2.py --smote-method density --smote-k-neighbors 5 --smote-density-threshold 0.1 --no-pdp
-python main5k_ale2.py --smote --smote-k-neighbors 7 --smote-density-threshold 0.3　--no-pdp
+- **Python 3.12**（conda: `new_base_env`）
+- **GBDT**: LightGBM, XGBoost, CatBoost
+- **scikit-learn**: RandomForest, 前処理、評価指標
+- **不均衡データ対策**: imbalanced-learn（SMOTE / SMOTETomek / Borderline-SMOTE）
+- **モデル解釈**: ALE, PDP, ICE
+- **可視化**: matplotlib
+- **次元削減**: UMAP
