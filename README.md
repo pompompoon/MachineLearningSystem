@@ -138,6 +138,18 @@ python main5k_ale2.py --compare-ale-pdp
 | `threshold_evaluator.py` | 閾値評価 |
 | `eye_tracking_visualizer.py` | データ可視化 |
 
+分類の可視化例
+<img width="726" height="629" alt="image" src="https://github.com/user-attachments/assets/c4caf22e-c454-4605-b16c-d302ea2df36e" />
+
+<img width="902" height="861" alt="image" src="https://github.com/user-attachments/assets/1a293563-7cfd-46b2-a355-d3086c483b8b" />
+
+<img width="1629" height="863" alt="image" src="https://github.com/user-attachments/assets/a05380a9-6464-4c53-ae76-6a67e0614c1a" />
+
+<img width="1054" height="860" alt="image" src="https://github.com/user-attachments/assets/d29b7807-c384-491c-9928-f2538e640bdc" />
+
+<img width="1245" height="873" alt="image" src="https://github.com/user-attachments/assets/70246409-5206-47fb-bea6-94bf4f492b6e" />
+
+
 
 回帰の可視化例
 
