@@ -156,3 +156,6 @@ python main5k_ale2.py --compare-ale-pdp
 - **モデル解釈**: ALE, PDP, ICE
 - **可視化**: matplotlib
 - **次元削減**: UMAP
+
+- <img width="981" height="543" alt="image" src="https://github.com/user-attachments/assets/0421dd9c-8244-4552-b4ce-23729c0fbf75" />
+
