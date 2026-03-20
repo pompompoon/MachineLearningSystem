@@ -143,10 +143,11 @@ python main5k_ale2.py --compare-ale-pdp
 
 <img width="938" height="623" alt="image" src="https://github.com/user-attachments/assets/1411c5b3-08ea-4786-99cf-15c628023e6c" />
 
-<img width="1028" height="623" alt="image" src="https://github.com/user-attachments/assets/525b7823-db2c-4ec8-8675-b454a658c6ad" />
-<img width="1044" height="615" alt="image" src="https://github.com/user-attachments/assets/6888077e-a8ed-4ec5-b2d5-adb11c26347e" />
+<img width="1042" height="615" alt="image" src="https://github.com/user-attachments/assets/c06a5620-14fb-4136-9768-083953c4886b" />
 
-<img width="1178" height="622" alt="image" src="https://github.com/user-attachments/assets/67ef9ce3-ec6c-4384-853c-09b0bf14d92c" />
+
+<img width="1178" height="615" alt="image" src="https://github.com/user-attachments/assets/f1a78d02-453b-4937-a53e-d778827f4d4c" />
+
 
 
 
