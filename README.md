@@ -169,13 +169,13 @@ python main5k_ale2.py --compare-ale-pdp
 
 
 <img width="1178" height="615" alt="image" src="https://github.com/user-attachments/assets/f1a78d02-453b-4937-a53e-d778827f4d4c" />
-住宅価格予測
-median_income: 地区の世帯収入の中央値（万ドル単位）。ALEが最も大きく、価格への影響が圧倒的に強い。
-ocean_proximity: 海への近さ（カテゴリ変数をエンコードしたもの）。INLAND, NEAR BAY, NEAR OCEAN, ISLANDなど。
-longitude: 経度。西に行くほど（沿岸部）価格が上がる傾向。
-latitude: 緯度。特定の緯度帯（SF・LA付近）で急上昇。
-ID: サンプルID。本来予測に使うべきでない特徴量で、データリーケージの可能性がある。ALE変動が大きいのは危険信号である。
-housing_median_age: 住宅の築年数中央値。古い住宅（都心部に多い）ほどやや高い傾向。
+〇住宅価格予測
+■median_income: 地区の世帯収入の中央値（万ドル単位）。ALEが最も大きく、価格への影響が圧倒的に強い。
+■ocean_proximity: 海への近さ（カテゴリ変数をエンコードしたもの）。INLAND, NEAR BAY, NEAR OCEAN, ISLANDなど。
+■longitude: 経度。西に行くほど（沿岸部）価格が上がる傾向。
+■latitude: 緯度。特定の緯度帯（SF・LA付近）で急上昇。
+■ID: サンプルID。本来予測に使うべきでない特徴量で、データリーケージの可能性がある。ALE変動が大きいのは危険信号である。
+■housing_median_age: 住宅の築年数中央値。古い住宅（都心部に多い）ほどやや高い傾向。
 
 
 
