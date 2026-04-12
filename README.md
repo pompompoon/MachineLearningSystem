@@ -186,6 +186,18 @@ python main5k_ale2.py --compare-ale-pdp
 ■ **median_income** が支配的。**ID** カラムは除外すべき。
 
 
+# 来客数予測
+
+<img width="1041" height="628" alt="image" src="https://github.com/user-attachments/assets/7f46ce8d-5d9b-4d93-9a66-0168fa261e72" />
+
+<img width="1178" height="621" alt="image" src="https://github.com/user-attachments/assets/2f867302-fa6d-4acb-9b9b-9b197e25c6dd" />
+
+来訪者数予測モデル ALE解釈
+特徴量解釈visitors_rolling_mean7過去7日間の来訪者数移動平均。ALE幅が最大（-30〜+30）で最も支配的な特徴量。直近の来訪トレンドが高ければ予測も上がる、自然な時系列的関係。area_sqm店舗面積。面積が大きいほど来訪者数が増加する明確な正の関係。店舗のキャパシティや立地規模を反映。visitors_rolling_mean3過去3日間の移動平均。7日版と同様の傾向だがALE幅がやや小さい（-15〜+15）。短期トレンドの補完的な役割。dow曜日。左側（平日前半）で-10、右側（週末）で+20。週末に来訪が集中する典型的な小売パターン。promo_budget_planned販促予算。低予算域では-25と大きくマイナス、予算増加に伴い+10まで上昇。販促投資と来訪者数の正の関係を捉えている。ただし高予算域（6以上）ではデータが疎でALEが不安定。is_holiday祝日フラグ。ALE値がほぼ0（Y軸スケール0.04）で影響なし。曜日やrolling_meanに祝日効果が吸収されている可能性が高い。
+
+
+
+
 
 
 ### feature_generation/ — 特徴量生成
