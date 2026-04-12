@@ -193,7 +193,9 @@ python main5k_ale2.py --compare-ale-pdp
 <img width="1178" height="621" alt="image" src="https://github.com/user-attachments/assets/2f867302-fa6d-4acb-9b9b-9b197e25c6dd" />
 
 #来訪者数予測モデル ALE解釈
+
 |特徴量|解釈|
+|--------------------|------|
 |visitors_rolling_mean7|過去7日間の来訪者数移動平均。|ALE幅が最大（-30〜+30）で最も支配的な特徴量。直近の来訪トレンドが高ければ予測も上がる、自然な時系列的関係|
 |area_|店舗面積が大きいほど来訪者数が増加する明確な正の関係。店舗のキャパシティや立地規模を反映。|
 |visitors_rolling_mean3|過去3日間の移動平均。7日版と同様の傾向だがALE幅がやや小さい（-15〜+15）。短期トレンドの補完的な役割。|
